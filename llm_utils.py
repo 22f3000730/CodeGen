@@ -1,34 +1,51 @@
 # llm_utils.py
 import os
-import openai
 from openai import OpenAI
 import re
 import json
+import base64
 from typing import Optional, List, Dict, Any
 
-def generate_app_files(brief: str, checks: str, attachments: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
+def generate_app_files(brief: str, checks: List[str], attachments: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
     api_key = os.getenv("AI_API_KEY")
     if not api_key:
         raise RuntimeError("AI_API_KEY environment variable is required")
 
     client = OpenAI(api_key=api_key,base_url="https://aipipe.org/openai/v1")
+    
     # System message: instruct model to return only a JSON object with "index","README" and optional "assets"
     system_msg = (
-        'You are to return a single-page project by implementing the user brief. It can be made with HTML, CSS and JS.'
-        'The page should not mimic or pretend to be working but instead should provide a working implementation of the brief if not properly simulate it. Make sure it passes all the checks'
-        'Respond with a single valid JSON object and nothing else. The JSON must '
-        'contain at least two keys: "index" (the complete index.html content for a '
-        'single-page app that implements the brief) and "README" (the README.md text). '
-        'Optionally include "assets" whose value is an object mapping filenames (e.g. "sample.png", "script.js") '
-        'to file contents. For binary assets you may embed data URIs (e.g. "data:image/png;base64,..."). '
-        'Do not include any surrounding markdown or explanatory text—only valid JSON.'
+        'You are a web development expert. Generate a complete, functional single-page application that implements the given brief. '
+        'Requirements:\n'
+        '1. Return ONLY a valid JSON object with no additional text\n'
+        '2. Required JSON keys:\n'
+        '   - "index": Complete index.html content with embedded CSS and JavaScript\n'
+        '   - "README": Full README.md documentation\n'
+        '3. When handling data URIs (data:[<mime-type>][;base64],<data>):\n'
+        '   - Properly decode base64 data based on mime-type:\n'
+        '     * text/csv → Parse into rows/columns\n'
+        '     * text/markdown → Render as HTML\n'
+        '     * text/plain → Process as needed\n'
+        '     * application/json → Parse into object\n'
+        '     * image/* → Use directly in img tags\n'
+        '   - Use appropriate JavaScript methods:\n'
+        '     * atob() for base64 decoding\n'
+        '     * TextDecoder for UTF-8 handling\n'
+        '     * URL.createObjectURL for binary data\n'
+        '4. Implementation must:\n'
+        '   - Be fully functional with proper error handling\n'
+        '   - Handle all data types appropriately\n'
+        '   - Process everything client-side\n'
+        '   - Pass all provided test checks\n'
+        'Include proper error handling for malformed or unexpected data.'
     )
 
-    # Prepare user message: include the brief and any attachments as JSON
-    user_payload = {"brief": brief,"checks": checks}
-    if attachments:
-        # Attachments are expected to be list of {"name": ..., "url": ...} where url may be a data URI
-        user_payload["attachments"] = attachments
+    # Prepare user message with raw attachments
+    user_payload = {
+        "brief": brief,
+        "checks": checks,
+        "attachments": attachments  # Pass attachments through without processing
+    }
 
     user_msg = json.dumps(user_payload, ensure_ascii=False, indent=2)
 

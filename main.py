@@ -17,6 +17,7 @@ class TaskRequest(BaseModel):
     email: str
     task: str
     brief: str
+    checks: List[str]
     round: int
     nonce: str
     secret: str
@@ -33,21 +34,21 @@ async def handle_task(req: TaskRequest):
         raise HTTPException(status_code=403, detail="Invalid secret")
 
     # 2. Generate minimal app files (with your LLM) — pass attachments through
-    app_files = generate_app_files(req.brief, attachments=req.attachments)
+    app_files = generate_app_files(req.brief, checks=req.checks, attachments=req.attachments)
 
     # Validate LLM output: expect dict with "index" and "README"
     if not isinstance(app_files, dict) or "index" not in app_files or "README" not in app_files:
         raise HTTPException(status_code=500, detail="LLM did not return expected file structure")
 
-    # Map to actual repo file paths; include any optional assets returned by the LLM
+    # Map to actual repo file paths
     files_to_commit = {
         "index.html": app_files["index"],
         "README.md": app_files["README"],
     }
-    # Accept optional assets dict: {"sample.png": "data:image/png;base64,...", "script.js": "..."}
-    assets = app_files.get("assets") or {}
-    for fname, content in assets.items():
-        files_to_commit[fname] = content
+    
+    # Include any optional assets
+    if isinstance(app_files.get("assets"), dict):
+        files_to_commit.update(app_files["assets"])
 
     # 3. Create GitHub repo
     g = Github(GITHUB_TOKEN)
