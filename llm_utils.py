@@ -34,10 +34,18 @@ def generate_app_files(brief: str, checks: List[str], attachments: Optional[List
         'Create a single-page web application that implements the requirements.\n\n'
         'Output format - JSON object with:\n'
         '- "index": Complete HTML file with implementation\n'
-        '- "README": Documentation markdown file\n\n'
+        '- "README": Documentation markdown file following this structure:\n'
+        '   1. Summary/Overview of the application\n'
+        '   2. Setup instructions\n'
+        '   3. Usage guide with examples\n'
+        '   4. Code explanation and architecture\n'
+        '   5. License information (MIT License)\n\n'
         'Technical requirements:\n'
         '1. Process data client-side\n'
-        '2. Use CDN libraries when needed\n'
+        '2. CDN requirements:\n'
+        '   - Use cdnjs.cloudflare.com as primary CDN provider\n'
+        '   - Use latest stable versions with specific version numbers\n'
+        '   - Preferred format: https://cdnjs.cloudflare.com/ajax/libs/LIBRARY/VERSION/FILE.min.js\n'
         '3. Base64 handling:\n'
         '   - Keep ${...} strings in data URIs as-is\n'
         '   - Do not try to decode template literals\n'
@@ -128,8 +136,48 @@ def generate_app_files(brief: str, checks: List[str], attachments: Optional[List
                 result["assets"] = sanitized_assets
         return result
 
-    # Fallback: return the assistant output as the index.html and a basic README
+    # Fallback: return the assistant output as the index.html and a structured README
+    readme_template = f"""# {brief}
+
+## Summary
+A web application that {brief.lower()}
+
+## Setup
+1. Clone the repository
+2. Open index.html in a web browser
+3. No additional setup required as all dependencies are loaded via CDN
+
+## Usage
+{content}
+
+## Code Explanation
+The application is built using vanilla JavaScript and processes data client-side.
+Please refer to the code comments in index.html for detailed implementation details.
+
+## License
+MIT License
+
+Copyright (c) {os.getenv('GITHUB_USER', '2024')}
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE."""
+
     return {
         "index": content,
-        "README": f"# {brief}\n\n{content}",
+        "README": readme_template,
     }

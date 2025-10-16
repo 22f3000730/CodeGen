@@ -137,6 +137,8 @@ async def handle_task(req: TaskRequest, background_tasks: BackgroundTasks):
     # 1. Secret verification
     if req.secret != SHARED_SECRET:
         raise HTTPException(status_code=403, detail="Invalid secret")
+    if req.email!="22f3000730@ds.study.iitm.ac.in":
+        raise HTTPException(status_code=403, detail="Invalid email")
 
     # Add the processing to background tasks
     background_tasks.add_task(process_task_in_background, req)
