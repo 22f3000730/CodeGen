@@ -96,6 +96,9 @@ async def handle_task(req: TaskRequest):
         "pages_url": f"https://{user.login}.github.io/{repo_name}/",
     }
 
+    # Wait for GitHub Pages to be live
+    time.sleep(60)  # Give GitHub Pages time to deploy
+
     # 8. POST to evaluation URL (with exponential backoff) — include JSON Content-Type & try up to 5 times
     delay = 1
     headers = {"Content-Type": "application/json"}
@@ -109,7 +112,11 @@ async def handle_task(req: TaskRequest):
         time.sleep(delay)
         delay *= 2
 
-    return {"status": "ok", "repo": repo.html_url, "commit": commit_sha}
+    return {
+        "repository_url": repo.html_url,
+        "commit_sha": commit_sha,
+        "pages_url": f"https://{user.login}.github.io/{repo_name}/"
+    }
 
 if __name__ == "__main__":
     import uvicorn

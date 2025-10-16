@@ -3,7 +3,6 @@ import os
 from openai import OpenAI
 import re
 import json
-import base64
 from typing import Optional, List, Dict, Any
 
 def generate_app_files(brief: str, checks: List[str], attachments: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
@@ -15,29 +14,16 @@ def generate_app_files(brief: str, checks: List[str], attachments: Optional[List
     
     # System message: instruct model to return only a JSON object with "index","README" and optional "assets"
     system_msg = (
-        'You are a web development expert. Generate a complete, functional single-page application that implements the given brief. '
-        'Requirements:\n'
-        '1. Return ONLY a valid JSON object with no additional text\n'
-        '2. Required JSON keys:\n'
-        '   - "index": Complete index.html content with embedded CSS and JavaScript\n'
-        '   - "README": Full README.md documentation\n'
-        '3. When handling data URIs (data:[<mime-type>][;base64],<data>):\n'
-        '   - Properly decode base64 data based on mime-type:\n'
-        '     * text/csv → Parse into rows/columns\n'
-        '     * text/markdown → Render as HTML\n'
-        '     * text/plain → Process as needed\n'
-        '     * application/json → Parse into object\n'
-        '     * image/* → Use directly in img tags\n'
-        '   - Use appropriate JavaScript methods:\n'
-        '     * atob() for base64 decoding\n'
-        '     * TextDecoder for UTF-8 handling\n'
-        '     * URL.createObjectURL for binary data\n'
-        '4. Implementation must:\n'
-        '   - Be fully functional with proper error handling\n'
-        '   - Handle all data types appropriately\n'
-        '   - Process everything client-side\n'
-        '   - Pass all provided test checks\n'
-        'Include proper error handling for malformed or unexpected data.'
+        'Build a web page according to brief requirements. Return ONLY a JSON object with:\n'
+        '"index": Complete HTML with working implementation\n'
+        '"README": Brief documentation\n\n'
+        'Rules:\n'
+        '- Use Appropriate Javascript libraries if required, CDN can be used\n'
+        '- Follow brief EXACTLY\n'
+        '- Match ID names precisely\n'
+        '- Make every check pass\n'
+        '- Process data client-side\n'
+        '- No placeholder/mock functionality'
     )
 
     # Prepare user message with raw attachments
