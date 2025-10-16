@@ -1,5 +1,5 @@
 # main.py
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 import requests,time, os
 from dotenv import load_dotenv
@@ -27,12 +27,8 @@ class TaskRequest(BaseModel):
 @app.get("/")
 def root():
     return {"status": "ok"}
-@app.post("/task1")
-async def handle_task(req: TaskRequest):
-    # 1. Secret verification
-    if req.secret != SHARED_SECRET:
-        raise HTTPException(status_code=403, detail="Invalid secret")
 
+async def process_task_in_background(req: TaskRequest):
     # 2. Generate files and handle repo based on round
     app_files = generate_app_files(
         brief=req.brief, 
@@ -136,11 +132,17 @@ async def handle_task(req: TaskRequest):
         time.sleep(delay)
         delay *= 2
 
-    return {
-        "repository_url": repo.html_url,
-        "commit_sha": commit_sha,
-        "pages_url": f"https://{user.login}.github.io/{repo_name}/"
-    }
+@app.post("/task1")
+async def handle_task(req: TaskRequest, background_tasks: BackgroundTasks):
+    # 1. Secret verification
+    if req.secret != SHARED_SECRET:
+        raise HTTPException(status_code=403, detail="Invalid secret")
+
+    # Add the processing to background tasks
+    background_tasks.add_task(process_task_in_background, req)
+
+    # Return simple acknowledgment
+    return {"status": "accepted", "message": "Request received and processing"}
 
 if __name__ == "__main__":
     import uvicorn

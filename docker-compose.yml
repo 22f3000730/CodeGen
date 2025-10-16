@@ -1,0 +1,11 @@
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - AI_API_KEY=${AI_API_KEY}
+    volumes:
+      - .:/app
