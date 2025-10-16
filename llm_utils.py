@@ -4,25 +4,62 @@ import requests
 import re
 import json
 from typing import Optional, List, Dict, Any
+from github import Github
 
-def generate_app_files(brief: str, checks: List[str], attachments: Optional[List[Dict[str, str]]] = None) -> Dict[str, Any]:
+def generate_app_files(brief: str, checks: List[str], attachments: Optional[List[Dict[str, str]]] = None, round: int = 1, task: str = None) -> Dict[str, Any]:
     api_key = os.getenv("AI_API_KEY")
+    github_token = os.getenv("GITHUB_TOKEN")
     if not api_key:
         raise RuntimeError("AI_API_KEY environment variable is required")
 
-    # System message: instruct model to return only a JSON object with "index","README" and optional "assets"
+    # Get existing code for rounds > 1
+    existing_files = {}
+    if round > 1 and github_token and task:
+        try:
+            g = Github(github_token)
+            user = g.get_user()
+            # Just use the task name as repo name, don't include user login
+            repo = g.get_repo(f"{user.login}/{task}")
+            for filename in ["index.html", "README.md"]:
+                try:
+                    file_content = repo.get_contents(filename)
+                    existing_files[filename] = file_content.decoded_content.decode('utf-8')
+                except Exception as e:
+                    print(f"Failed to fetch {filename}: {str(e)}")
+        except Exception as e:
+            print(f"Failed to access repository: {str(e)}")
+
+    # Modify system message to include context for updates
     system_msg = (
-        'Build a web page according to brief requirements. Return ONLY a JSON object with:\n'
-        '"index": Complete HTML with working implementation\n'
-        '"README": Brief documentation\n\n'
-        'Rules:\n'
-        '- Use Appropriate Javascript libraries if required, CDN can be used\n'
-        '- Follow brief EXACTLY\n'
-        '- Match ID names precisely\n'
-        '- Make every check pass\n'
-        '- Process data client-side\n'
-        '- No placeholder/mock functionality'
+        'Create a single-page web application that implements the requirements.\n\n'
+        'Output format - JSON object with:\n'
+        '- "index": Complete HTML file with implementation\n'
+        '- "README": Documentation markdown file\n\n'
+        'Technical requirements:\n'
+        '1. Process data client-side\n'
+        '2. Use CDN libraries when needed\n'
+        '3. Base64 handling:\n'
+        '   - Keep ${...} strings in data URIs as-is\n'
+        '   - Do not try to decode template literals\n'
+        '   - Example: data:text/csv;base64,${someBase64} should be used directly\n'
+        '4. Match exact IDs from brief\n'
+        '5. Handle all test conditions\n\n'
+        'Best practices:\n'
+        '- Process encoded data at runtime\n'
+        '- Keep template literals intact\n'
+        '- Include error handling\n'
+        '- Verify all test checks pass'
     )
+
+    if round > 1 and existing_files:
+        system_msg += (
+            '\n\nUpdate mode:\n'
+            '- Use existing files as base\n'
+            '- Preserve working features\n'
+            '- Add new requirements\n'
+            '- Maintain code structure\n'
+            '- Use the attachments if provided\n'
+        )
 
     # Prepare messages and make direct request to OpenRouter
     headers = {
@@ -30,11 +67,22 @@ def generate_app_files(brief: str, checks: List[str], attachments: Optional[List
         "Content-Type": "application/json"
     }
 
+    # Prepare user message with clearer context
+    user_payload = {
+        "brief": brief,
+        "checks": checks,
+        "attachments": attachments,
+        "round": round,
+        "note": "Important: Keep ${...} template literals intact in data URIs"
+    }
+    if existing_files:
+        user_payload["existing_files"] = existing_files
+
     payload = {
         "model": "qwen/qwen3-coder",
         "messages": [
             {"role": "system", "content": system_msg},
-            {"role": "user", "content": json.dumps({"brief": brief, "checks": checks, "attachments": attachments}, ensure_ascii=False, indent=2)}
+            {"role": "user", "content": json.dumps(user_payload, ensure_ascii=False, indent=2)}
         ]
     }
 
