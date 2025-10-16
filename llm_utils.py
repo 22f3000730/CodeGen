@@ -1,6 +1,6 @@
 # llm_utils.py
 import os
-from openai import OpenAI
+import requests
 import re
 import json
 from typing import Optional, List, Dict, Any
@@ -10,8 +10,6 @@ def generate_app_files(brief: str, checks: List[str], attachments: Optional[List
     if not api_key:
         raise RuntimeError("AI_API_KEY environment variable is required")
 
-    client = OpenAI(api_key=api_key,base_url="https://aipipe.org/openai/v1")
-    
     # System message: instruct model to return only a JSON object with "index","README" and optional "assets"
     system_msg = (
         'Build a web page according to brief requirements. Return ONLY a JSON object with:\n'
@@ -26,30 +24,34 @@ def generate_app_files(brief: str, checks: List[str], attachments: Optional[List
         '- No placeholder/mock functionality'
     )
 
-    # Prepare user message with raw attachments
-    user_payload = {
-        "brief": brief,
-        "checks": checks,
-        "attachments": attachments  # Pass attachments through without processing
+    # Prepare messages and make direct request to OpenRouter
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
     }
 
-    user_msg = json.dumps(user_payload, ensure_ascii=False, indent=2)
+    payload = {
+        "model": "qwen/qwen3-coder",
+        "messages": [
+            {"role": "system", "content": system_msg},
+            {"role": "user", "content": json.dumps({"brief": brief, "checks": checks, "attachments": attachments}, ensure_ascii=False, indent=2)}
+        ]
+    }
 
-    resp = client.chat.completions.create(model="gpt-4o-mini",
-    messages=[
-        {"role": "system", "content": system_msg},
-        {"role": "user", "content": user_msg},
-    ])
+    resp = requests.post(
+        "https://aipipe.org/openrouter/v1/chat/completions",
+        headers=headers,
+        json=payload
+    )
 
-    # Try to extract assistant content; support common response shapes
-    content = None
+    if not resp.ok:
+        raise RuntimeError(f"API request failed: {resp.status_code} {resp.text}")
+
+    # Extract content from OpenRouter response format
     try:
-        content = resp.choices[0].message.content
-    except Exception:
-        try:
-            content = resp.choices[0].text
-        except Exception:
-            content = str(resp)
+        content = resp.json()["choices"][0]["message"]["content"]
+    except Exception as e:
+        content = str(resp.text)
 
     # Attempt to extract JSON substring if wrapped in markdown or extra text
     json_obj = None
